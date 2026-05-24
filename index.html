@@ -8,7 +8,7 @@
         body { background: #111; color: white; font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; margin: 0; padding: 10px; overflow: hidden; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; }
         h1 { margin: 0; font-size: 1.6rem; color: #ffcc00; text-transform: uppercase; letter-spacing: 2px; }
         
-        /* THE MAP */
+        /* THE MAP GRID */
         .battlefield { width: 340px; height: 420px; background: #2e7d32; border: 4px solid #1b5e20; margin: 5px auto; border-radius: 12px; position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.5); overflow: hidden; }
         .river { position: absolute; top: 200px; left: 0; width: 100%; height: 20px; background: #0288d1; border-top: 2px solid #01579b; border-bottom: 2px solid #01579b; }
         .bridge { position: absolute; top: 198px; width: 45px; height: 24px; background: #795548; border: 2px solid #4e342e; border-radius: 4px; z-index: 2; cursor: pointer; }
@@ -21,7 +21,7 @@
         .tower.player { border-color: #3b82f6; background: #1e3a8a; }
         
         /* TROOPS */
-        .entity { position: absolute; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; transform: translate(-50%, -50%); transition: all 0.1s linear; z-index: 5; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .entity { position: absolute; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; transform: translate(-50%, -50%); z-index: 5; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
         .entity.player-team { background: #3b82f6; border: 1px solid #fff; }
         .entity.bot-team { background: #ef4444; border: 1px solid #fff; }
 
@@ -45,13 +45,12 @@
 <body>
 
     <h1>👑 Rizz Royale 👑</h1>
-    <div id="ticker" class="battle-log">Select a card and tap a Bridge to drop troops!</div>
+    <div id="ticker" class="battle-log">Select a card and tap your side of the map to drop troops!</div>
 
     <div class="battlefield" id="arena" onclick="handleMapClick(event)">
         <div class="river"></div>
-        <!-- BRIDGES ACT AS HOTSPOTS TO DEPLOY IN LANES -->
-        <div class="bridge left" id="bridge-left"></div>
-        <div class="bridge right" id="bridge-right"></div>
+        <div class="bridge left"></div>
+        <div class="bridge right"></div>
 
         <!-- BOT STRUCTURES -->
         <div class="tower bot" style="top:15px; left:154px;" id="bot-king">👑</div>
@@ -64,13 +63,11 @@
         <div class="tower player" style="bottom:40px; right:50px;" id="player-right">🏹</div>
     </div>
 
-    <!-- RIZZLIXER RESOURCE TRACKER -->
     <div class="rizzlixer-dock">
         <div class="rizzlixer-bg"><div class="rizzlixer-bar" id="elixir-fluid"></div></div>
         <div class="rizzlixer-text" id="elixir-label">Rizzlixer: 0 / 10</div>
     </div>
 
-    <!-- ACTIONS CARD DECK CONTAINER -->
     <div class="deck-zone">
         <div class="card" onclick="selectCard(0, event)" id="card-0">
             <p class="card-name">Rizz-lits</p>
@@ -91,7 +88,6 @@
     </div>
 
     <script>
-        // Game configuration registers
         const cardsRegistry = [
             { name: "Rizz-lits", cost: 2, type: "swarm", count: 3, hp: 45, dmg: 12, speed: 4, icon: "👥" },
             { name: "Rizz Ray", cost: 3, type: "spell", dmg: 80, icon: "⚡" },
@@ -104,13 +100,11 @@
         let entities = [];
         let gameActive = true;
 
-        // Base health states
         let towerHP = {
             "player-king": 1000, "player-left": 600, "player-right": 600,
             "bot-king": 1000, "bot-left": 600, "bot-right": 600
         };
 
-        // Track positions for combat pathfinders
         const targetsPos = {
             "bot-left": { x: 66, y: 56 }, "bot-right": { x: 274, y: 56 }, "bot-king": { x: 170, y: 31 },
             "player-left": { x: 66, y: 364 }, "player-right": { x: 274, y: 364 }, "player-king": { x: 170, y: 389 }
@@ -119,8 +113,6 @@
         function selectCard(idx, e) {
             e.stopPropagation();
             if(!gameActive) return;
-            
-            // Remove previous highlights
             document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
             
             if (selectedCardIndex === idx) {
@@ -143,25 +135,20 @@
             const rect = document.getElementById('arena').getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
-            
-            // Determine lane vector pathing
             const lane = clickX < 170 ? "left" : "right";
 
             if (card.type === "spell") {
-                // Instantly execute blast math across target zone array structures
                 executeRizzRayBlast(clickX, clickY);
             } else {
-                // Deny deep spawning on bot territory lines
                 if (clickY < 210) {
                     document.getElementById('ticker').innerText = "Cannot spawn on enemy side!";
                     return;
                 }
                 
-                // Deploy tactical troop elements
                 for(let i=0; i < (card.count || 1); i++) {
-                    spawnTroop("player", lane, card, clickX + (i*10 - 10), 340);
+                    spawnTroop("player", lane, card, clickX + (i*12 - 12), clickY);
                 }
-                document.getElementById('ticker').innerText = `Deployed ${card.name} into the ${lane} lane!`;
+                document.getElementById('ticker').innerText = `Deployed ${card.name}!`;
             }
 
             playerRizzlixer -= card.cost;
@@ -171,12 +158,10 @@
 
         function spawnTroop(team, lane, blueprint, startX, startY) {
             const id = "unit_" + Date.now() + Math.random().toString(36).substr(2, 4);
-            
-            // Render visible node elements onto viewport map canvas
             const div = document.createElement('div');
             div.className = `entity ${team}-team`;
             div.id = id;
-            div.innerText = blueprint.icon[0];
+            div.innerText = blueprint.icon;
             div.style.left = startX + "px";
             div.style.top = startY + "px";
             document.getElementById('arena').appendChild(div);
@@ -189,3 +174,114 @@
         }
 
         function executeRizzRayBlast(targetX, targetY) {
+            document.getElementById('ticker').innerText = "Rizz Ray launched!";
+            const blast = document.createElement('div');
+            blast.style.position = "absolute"; blast.style.left = (targetX - 35) + "px"; blast.style.top = (targetY - 35) + "px";
+            blast.style.width = "70px"; blast.style.height = "70px"; blast.style.background = "rgba(208, 0, 255, 0.4)";
+            blast.style.borderRadius = "50%"; blast.style.zIndex = "10"; blast.style.transition = "all 0.3s ease";
+            document.getElementById('arena').appendChild(blast);
+            setTimeout(() => blast.remove(), 300);
+
+            entities.forEach(ent => {
+                if (ent.team === "bot") {
+            document.getElementById('elixir-fluid').style.width = `${playerRizzlixer * 10}%`;
+            document.getElementById('elixir-label').innerText = `Rizzlixer: ${Math.floor(playerRizzlixer)} / 10`;
+
+            executeBotBrainDecision();
+            processBattlePhysics();
+        }, 100);
+
+        function executeBotBrainDecision() {
+            if (Math.random() < 0.04) { 
+                const botLane = Math.random() < 0.5 ? "left" : "right";
+                const botChoice = Math.random();
+                const startX = botLane === "left" ? 65 : 275;
+                
+                if (botChoice < 0.45) {
+                    // Spawns 3 Bot Rizz-lits
+                    for(let i=0; i<3; i++) spawnTroop("bot", botLane, cardsRegistry[0], startX + (i*12-12), 60);
+                } else if (botChoice < 0.8) {
+                    // Spawns Bot Aura Archer
+                    spawnTroop("bot", botLane, cardsRegistry[3], startX, 60);
+                } else {
+                    // Spawns Bot Sigma Giant
+                    spawnTroop("bot", botLane, cardsRegistry[2], startX, 50);
+                }
+            }
+        }
+
+        function processBattlePhysics() {
+            let activeEntities = [];
+
+            entities.forEach(ent => {
+                const dom = document.getElementById(ent.id);
+                if (!dom) return;
+
+                if (ent.hp <= 0) {
+                    dom.remove();
+                    return;
+                }
+
+                let targetStructure = ent.team === "player" ? `bot-${ent.lane}` : `player-${ent.lane}`;
+                if (towerHP[targetStructure] <= 0) targetStructure = ent.team === "player" ? "bot-king" : "player-king";
+
+                const targetCoord = targetsPos[targetStructure];
+                const distanceToObjective = Math.hypot(targetCoord.x - ent.x, targetCoord.y - ent.y);
+
+                let fightTarget = null;
+                entities.forEach(enemy => {
+                    if (enemy.team !== ent.team && enemy.lane === ent.lane && enemy.hp > 0) {
+                        const range = Math.hypot(enemy.x - ent.x, enemy.y - ent.y);
+                        if (range < 25 && ent.type !== "tank") {
+                            fightTarget = enemy;
+                        }
+                    }
+                });
+
+                if (fightTarget) {
+                    fightTarget.hp -= (ent.dmg / 5);
+                } else if (distanceToObjective < 22) {
+                    towerHP[targetStructure] -= (ent.dmg / 4);
+                    checkTowerCondition(targetStructure);
+                    if (ent.type === "tank") ent.hp -= 10; 
+                } else {
+                    const headingY = targetCoord.y > ent.y ? 1 : -1;
+                    ent.y += (headingY * ent.speed * 2);
+                    
+                    const laneTargetX = ent.lane === "left" ? 65 : 275;
+                    if (Math.abs(ent.x - laneTargetX) > 5) {
+                        ent.x += (ent.x < laneTargetX ? 2 : -2);
+                    }
+
+                    dom.style.left = ent.x + "px";
+                    dom.style.top = ent.y + "px";
+                }
+
+                activeEntities.push(ent);
+            });
+
+            entities = activeEntities;
+        }
+
+        function checkTowerCondition(id) {
+            const towerDom = document.getElementById(id);
+            if (!towerDom) return;
+
+            if (towerHP[id] <= 0) {
+                towerDom.style.background = "#555";
+                towerDom.innerText = "❌";
+                
+                if (id === "bot-king") triggerMatchEnd("VICTORY! MAXIMUM AURA UNLOCKED!");
+                if (id === "player-king") triggerMatchEnd("DEFEAT! YOU LOST YOUR RIZZ!");
+            }
+        }
+
+        function triggerMatchEnd(message) {
+            gameActive = false;
+            document.getElementById('ticker').style.fontSize = "16px";
+            document.getElementById('ticker').innerText = message;
+            alert(message);
+        }
+    </script>
+</body>
+</html>
